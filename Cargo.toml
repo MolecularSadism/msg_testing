@@ -1,0 +1,13 @@
+[package]
+name = "msg_testing"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Testing helpers for Bevy applications with fixed timestep support."
+repository = "https://github.com/MolecularSadism/msg_testing"
+keywords = ["bevy", "test", "gamedev"]
+categories = ["game-development"]
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_asset"] }
+float-cmp = "0.10"
