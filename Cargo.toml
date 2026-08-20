@@ -1,6 +1,6 @@
 [package]
 name = "msg_testing"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Testing helpers for Bevy applications with fixed timestep support."
@@ -11,3 +11,7 @@ categories = ["game-development"]
 [dependencies]
 bevy = { version = "0.18", default-features = false, features = ["bevy_asset"] }
 float-cmp = "0.10"
+
+[features]
+default = []
+gpu = ["bevy/default"]

@@ -12,6 +12,7 @@
 //!   - `update_n()` / `fixed_update_n()` - Run multiple update cycles
 //!   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
 //! - **`assert_approx_eq!`** - Floating point equality assertions (re-exported from float-cmp)
+//! - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
 //!
 //! # Quick Start
 //!
@@ -105,10 +106,16 @@ use bevy::app::App;
 use bevy::asset::{AssetMetaCheck, AssetPlugin};
 use bevy::prelude::{Fixed, MinimalPlugins};
 use bevy::time::{Real, Time, TimeUpdateStrategy, Virtual};
+use std::path::PathBuf;
 use std::time::Duration;
 
 // Re-export float-cmp for floating point comparisons in tests
 pub use float_cmp::{approx_eq, assert_approx_eq};
+
+#[cfg(feature = "gpu")]
+pub mod gpu;
+#[cfg(feature = "gpu")]
+pub use gpu::{GpuBenchConfig, gpu_app, gpu_app_ready, is_software_renderer};
 
 /// Extension trait for App to add testing utilities.
 ///
@@ -366,4 +373,52 @@ pub fn test_asset_plugin() -> AssetPlugin {
         watch_for_changes_override: Some(false),
         ..Default::default()
     }
+}
+
+/// Build a throwaway directory tree for a test that feeds itself its own
+/// files, and return its root.
+///
+/// Tests that exercise file discovery or loading should hand-make the files
+/// they read instead of reaching into an application's real asset tree —
+/// otherwise the test silently couples to content that changes for editorial
+/// reasons. Each entry pairs a root-relative path with the file's contents;
+/// parent directories are created as needed.
+///
+/// The tree lives under the OS temp directory, in a directory unique to the
+/// calling process and `label`, so parallel tests in one binary get disjoint
+/// trees as long as each call site picks its own label. Any tree left behind
+/// by a previous run under the same label is removed first, so a test always
+/// starts from exactly the files it lists.
+///
+/// # Example
+///
+/// ```
+/// use msg_testing::fixture_dir;
+///
+/// let root = fixture_dir(
+///     "doc_example",
+///     &[
+///         ("config/app.config.ron", "()"),
+///         ("save/slot_1.save.ron", "(level: 3)"),
+///     ],
+/// );
+///
+/// assert_eq!(
+///     std::fs::read_to_string(root.join("save/slot_1.save.ron")).unwrap(),
+///     "(level: 3)"
+/// );
+/// ```
+pub fn fixture_dir(label: &str, files: &[(&str, &str)]) -> PathBuf {
+    let root = std::env::temp_dir().join(format!(
+        "msg_testing_fixture_{}_{label}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&root);
+    for (path, contents) in files {
+        let path = root.join(path);
+        std::fs::create_dir_all(path.parent().expect("fixture files sit in a directory"))
+            .expect("fixture directory is writable");
+        std::fs::write(&path, contents).expect("fixture file is writable");
+    }
+    root
 }

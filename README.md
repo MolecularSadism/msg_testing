@@ -12,6 +12,8 @@ A testing utilities crate for Bevy applications, providing convenient helpers fo
   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
 - **Float comparison helpers** - Re-exports `assert_approx_eq!` from float-cmp
 - **Default timestep handling** - Uses Bevy's default fixed timestep automatically
+- **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
+- **`gpu` feature** - `gpu_app()`, `gpu_app_ready()`, `is_software_renderer()`, and `GpuBenchConfig` for tests/benches that need a real render backend
 
 ## Installation
 
@@ -19,7 +21,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-msg_testing = "0.1"
+msg_testing = "0.2"
 ```
 
 ## Quick Start
@@ -217,6 +219,7 @@ All time-related behavior matches what you'd see in a real Bevy application.
 
 | `msg_testing` | Bevy   |
 |--------------|--------|
+| 0.2          | 0.18   |
 | 0.1          | 0.18   |
 
 ## License
