@@ -10,7 +10,7 @@ A testing utilities crate for Bevy applications, providing convenient helpers fo
   - `fixed_update()` / `fixed_update_n()` - Step through fixed updates
   - `update()` / `update_n()` - Run multiple update cycles
   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
-- **Float comparison helpers** - Re-exports `assert_approx_eq!` from float-cmp
+- **Float comparison helpers** - `assert_approx_eq!` with a default `1e-4` absolute tolerance (and `approx_eq!` re-exported from float-cmp)
 - **Default timestep handling** - Uses Bevy's default fixed timestep automatically
 - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
 - **`gpu` feature** - `gpu_app()`, `gpu_app_ready()`, `is_software_renderer()`, and `GpuBenchConfig` for tests/benches that need a real render backend
