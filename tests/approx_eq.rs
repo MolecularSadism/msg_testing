@@ -38,6 +38,31 @@ fn f64_operands_panic() {
 }
 
 #[test]
+fn equal_infinities_pass() {
+    assert_approx_eq!(f32::INFINITY, f32::INFINITY);
+    assert_approx_eq!(f32::NEG_INFINITY, f32::NEG_INFINITY);
+    assert_approx_eq!(f64::INFINITY, f64::INFINITY, 0.5);
+}
+
+#[test]
+#[should_panic(expected = "NaN !~= NaN")]
+fn nan_operands_panic() {
+    assert_approx_eq!(f32::NAN, f32::NAN);
+}
+
+#[test]
+fn difference_equal_to_tolerance_passes() {
+    assert_approx_eq!(1.0_f32, 1.5, 0.5);
+    assert_approx_eq!(1.5_f32, 1.0, 0.5);
+}
+
+#[test]
+fn both_forms_are_expressions() {
+    let () = assert_approx_eq!(1.0_f32, 1.0);
+    let () = assert_approx_eq!(1.0_f32, 1.0, 0.5);
+}
+
+#[test]
 fn accepts_trailing_comma() {
     assert_approx_eq!(1.0_f32, 1.0,);
     assert_approx_eq!(1.0_f32, 1.0, 0.5,);

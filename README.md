@@ -6,6 +6,7 @@ A testing utilities crate for Bevy applications, providing convenient helpers fo
 
 - **Physics-enabled test apps** - Pre-configured apps with fixed timestep support
 - **Paused time testing** - Test apps where time never advances
+- **Minimal test apps** - `minimal_app()` bare `MinimalPlugins` app for tests that don't depend on time
 - **`AppTesting` trait** - Extension methods for app testing:
   - `fixed_update()` / `fixed_update_n()` - Step through fixed updates
   - `update()` / `update_n()` - Run multiple update cycles
@@ -21,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-msg_testing = "0.2"
+msg_testing = "0.3"
 ```
 
 ## Quick Start
@@ -107,6 +108,16 @@ app.add_systems(FixedUpdate, should_not_run);
 for _ in 0..1000 {
     app.update(); // Fixed update never runs
 }
+```
+
+### `minimal_app()`
+
+Creates a bare Bevy app with only `MinimalPlugins`. Use this for tests that just need a headless app with schedules and don't depend on time: time advances with the real wall clock, so deltas are nondeterministic and `FixedUpdate` may run zero or more times per `update()`. Time-sensitive tests should use `physics_app()` or `paused_app()` instead.
+
+```rust
+let mut app = minimal_app();
+app.add_systems(Update, my_system);
+app.update();
 ```
 
 ### `AppTesting` trait
@@ -219,6 +230,7 @@ All time-related behavior matches what you'd see in a real Bevy application.
 
 | `msg_testing` | Bevy   |
 |--------------|--------|
+| 0.3          | 0.18   |
 | 0.2          | 0.18   |
 | 0.1          | 0.18   |
 

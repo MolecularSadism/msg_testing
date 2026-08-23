@@ -115,10 +115,18 @@ pub use float_cmp::approx_eq;
 
 /// Assert that two floating point values are approximately equal.
 ///
-/// The two-argument form uses a default absolute tolerance of `1e-4`. The
-/// three-argument form takes an explicit absolute tolerance. Like the standard
-/// library's assert macros, the operands are generic: any type supporting
-/// subtraction and ordering works, `f32` and `f64` in particular.
+/// The two-argument form uses a default absolute tolerance of `1e-4`; because
+/// that default is a bare float literal, the two-argument form works with
+/// `f32` and `f64` operands. The three-argument form takes an explicit
+/// absolute tolerance and works with any `Copy + PartialOrd + Sub + Debug`
+/// type whose difference is comparable to the tolerance. Exactly equal
+/// operands always pass, including equal infinities.
+///
+/// The tolerance is absolute, not relative: the `1e-4` default is only
+/// meaningful for values of roughly unit magnitude. For large values, where
+/// the spacing between adjacent representable floats can exceed `1e-4`, pass
+/// an explicit tolerance — or use the re-exported float-cmp [`approx_eq!`]
+/// for ULP-based comparison.
 ///
 /// On failure, the panic message shows both values and the tolerance.
 ///
@@ -136,7 +144,7 @@ pub use float_cmp::approx_eq;
 #[macro_export]
 macro_rules! assert_approx_eq {
     ($left:expr, $right:expr $(,)?) => {
-        $crate::assert_approx_eq!($left, $right, 1e-4);
+        $crate::assert_approx_eq!($left, $right, 1e-4)
     };
     ($left:expr, $right:expr, $tolerance:expr $(,)?) => {
         match (&$left, &$right, &$tolerance) {
@@ -147,7 +155,7 @@ macro_rules! assert_approx_eq {
                     *right - *left
                 };
                 assert!(
-                    difference <= *tolerance,
+                    *left == *right || difference <= *tolerance,
                     "assertion `left ~= right` failed: {left:?} !~= {right:?} (tolerance: {tolerance:?})"
                 );
             }
@@ -335,8 +343,7 @@ impl AppTesting for App {
 /// app.fixed_update();
 /// ```
 pub fn physics_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    let mut app = minimal_app();
 
     let timestep = app.world().resource::<Time<Fixed>>().timestep();
 
@@ -385,8 +392,7 @@ pub fn physics_app() -> App {
 /// assert_eq!(counter.0, 0);
 /// ```
 pub fn paused_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    let mut app = minimal_app();
 
     // Pause virtual time so fixed update never runs
     app.world_mut().resource_mut::<Time<Virtual>>().pause();
@@ -397,8 +403,12 @@ pub fn paused_app() -> App {
 /// Create a bare test app with only [`MinimalPlugins`].
 ///
 /// Use this for tests that don't care about fixed timestep behavior and just
-/// need a headless app with schedules and time. For deterministic
-/// `FixedUpdate` stepping use [`physics_app()`] instead.
+/// need a headless app with schedules and time. Time advances with the real
+/// wall clock, so `Update`-schedule deltas are nondeterministic and
+/// `FixedUpdate` may run zero or more times per `update()` call depending on
+/// how long the test takes. Time-sensitive tests should use [`physics_app()`]
+/// for deterministic `FixedUpdate` stepping or [`paused_app()`] for frozen
+/// time instead.
 ///
 /// # Example
 ///
