@@ -7,11 +7,12 @@
 //!
 //! - **`physics_app()`** - Pre-configured test app with fixed timestep
 //! - **`paused_app()`** - Test app with frozen time
+//! - **`minimal_app()`** - Bare test app with only `MinimalPlugins`
 //! - **`AppTesting`** trait - Extension methods for app testing
 //!   - `fixed_update()` - Step through one fixed update
 //!   - `update_n()` / `fixed_update_n()` - Run multiple update cycles
 //!   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
-//! - **`assert_approx_eq!`** - Floating point equality assertions (re-exported from float-cmp)
+//! - **`assert_approx_eq!`** - Absolute-tolerance floating point equality assertion
 //! - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
 //!
 //! # Quick Start
@@ -109,8 +110,58 @@ use bevy::time::{Real, Time, TimeUpdateStrategy, Virtual};
 use std::path::PathBuf;
 use std::time::Duration;
 
-// Re-export float-cmp for floating point comparisons in tests
-pub use float_cmp::{approx_eq, assert_approx_eq};
+// Re-export float-cmp for ULP-based floating point comparisons in tests
+pub use float_cmp::approx_eq;
+
+/// Assert that two floating point values are approximately equal.
+///
+/// The two-argument form uses a default absolute tolerance of `1e-4`; because
+/// that default is a bare float literal, the two-argument form works with
+/// `f32` and `f64` operands. The three-argument form takes an explicit
+/// absolute tolerance and works with any `Copy + PartialOrd + Sub + Debug`
+/// type whose difference is comparable to the tolerance. Exactly equal
+/// operands always pass, including equal infinities.
+///
+/// The tolerance is absolute, not relative: the `1e-4` default is only
+/// meaningful for values of roughly unit magnitude. For large values, where
+/// the spacing between adjacent representable floats can exceed `1e-4`, pass
+/// an explicit tolerance — or use the re-exported float-cmp [`approx_eq!`]
+/// for ULP-based comparison.
+///
+/// On failure, the panic message shows both values and the tolerance.
+///
+/// # Example
+///
+/// ```
+/// use msg_testing::assert_approx_eq;
+///
+/// // Within the default 1e-4 tolerance.
+/// assert_approx_eq!(1.0_f32, 1.000_05);
+///
+/// // Explicit tolerance, f64 operands.
+/// assert_approx_eq!(2.0_f64, 2.04, 0.05);
+/// ```
+#[macro_export]
+macro_rules! assert_approx_eq {
+    ($left:expr, $right:expr $(,)?) => {
+        $crate::assert_approx_eq!($left, $right, 1e-4)
+    };
+    ($left:expr, $right:expr, $tolerance:expr $(,)?) => {
+        match (&$left, &$right, &$tolerance) {
+            (left, right, tolerance) => {
+                let difference = if *left > *right {
+                    *left - *right
+                } else {
+                    *right - *left
+                };
+                assert!(
+                    *left == *right || difference <= *tolerance,
+                    "assertion `left ~= right` failed: {left:?} !~= {right:?} (tolerance: {tolerance:?})"
+                );
+            }
+        }
+    };
+}
 
 #[cfg(feature = "gpu")]
 pub mod gpu;
@@ -292,8 +343,7 @@ impl AppTesting for App {
 /// app.fixed_update();
 /// ```
 pub fn physics_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    let mut app = minimal_app();
 
     let timestep = app.world().resource::<Time<Fixed>>().timestep();
 
@@ -342,12 +392,41 @@ pub fn physics_app() -> App {
 /// assert_eq!(counter.0, 0);
 /// ```
 pub fn paused_app() -> App {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    let mut app = minimal_app();
 
     // Pause virtual time so fixed update never runs
     app.world_mut().resource_mut::<Time<Virtual>>().pause();
 
+    app
+}
+
+/// Create a bare test app with only [`MinimalPlugins`].
+///
+/// Use this for tests that don't care about fixed timestep behavior and just
+/// need a headless app with schedules and time. Time advances with the real
+/// wall clock, so `Update`-schedule deltas are nondeterministic and
+/// `FixedUpdate` may run zero or more times per `update()` call depending on
+/// how long the test takes. Time-sensitive tests should use [`physics_app()`]
+/// for deterministic `FixedUpdate` stepping or [`paused_app()`] for frozen
+/// time instead.
+///
+/// # Example
+///
+/// ```
+/// use bevy::prelude::*;
+/// use msg_testing::minimal_app;
+///
+/// #[derive(Resource, Default)]
+/// struct Counter(usize);
+///
+/// let mut app = minimal_app();
+/// app.init_resource::<Counter>();
+/// app.update();
+/// assert_eq!(app.world().resource::<Counter>().0, 0);
+/// ```
+pub fn minimal_app() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
     app
 }
 
