@@ -14,7 +14,6 @@ pub fn gpu_app() -> App {
     app.add_plugins(
         DefaultPlugins
             .build()
-            .disable::<bevy::audio::AudioPlugin>()
             .disable::<WinitPlugin>()
             .disable::<PipelinedRenderingPlugin>()
             .set(WindowPlugin {

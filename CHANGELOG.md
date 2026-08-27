@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- `gpu` feature no longer pulls in `bevy/default` (audio, 2d, 3d, ui); it now
+  enables only `bevy_render`/`bevy_winit`/`bevy_image`/`bevy_window`, so
+  `gpu_app()` no longer drags `bevy_audio` into consumers' test builds.
+
 ## 0.3.0
 
 - **Breaking:** `assert_approx_eq!` is now this crate's own value-first macro —
