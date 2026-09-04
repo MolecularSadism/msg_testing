@@ -231,10 +231,8 @@ All time-related behavior matches what you'd see in a real Bevy application.
 ## Bevy compatibility
 
 | `msg_testing` | Bevy   |
-|--------------|--------|
-| 0.3          | 0.18   |
-| 0.2          | 0.18   |
-| 0.1          | 0.18   |
+|---------------|--------|
+| 0.1-0.4       | 0.18   |
 
 ## License
 
