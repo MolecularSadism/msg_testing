@@ -127,7 +127,9 @@ Extension trait that adds convenient testing methods to Bevy's `App`:
 - **`fixed_update()`** - Advance time by one fixed timestep and run FixedUpdate
 - **`fixed_update_n(count)`** - Run multiple fixed updates
 - **`update_n(count)`** - Run multiple update cycles
-- **`advance_time(millis)`** - Advance virtual time by milliseconds
+- **`with_timestep(timestep)`** - Run `FixedUpdate` at an application-chosen rate, still one step per `update()`: `physics_app().with_timestep(Duration::from_secs_f64(1.0 / 60.0))`. Use it when a plugin added later would replace `Time<Fixed>` with a different step
+- **`update_until(budget, done)`** - Run updates, sleeping a millisecond between them, until `done(&app)` holds or the wall-clock `budget` elapses; returns whether it held. Use it to wait for task-pool work (asset loads, async compute) instead of a fixed update count
+- **`advance_time(millis)`** - Advance virtual time by milliseconds (also the generic `Time` clock, so `run_system_once` sees it)
 - **`advance_time_secs(secs)`** - Advance virtual time by seconds
 
 ```rust

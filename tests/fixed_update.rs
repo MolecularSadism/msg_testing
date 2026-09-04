@@ -1,5 +1,5 @@
 use bevy::ecs::system::ResMut;
-use bevy::prelude::{FixedUpdate, Reflect, Resource, Update};
+use bevy::prelude::{Fixed, FixedUpdate, Reflect, Res, Resource, Time, Update};
 use msg_testing::{AppTesting, paused_app, physics_app};
 
 #[derive(Resource, Reflect, Debug, Default)]
@@ -84,4 +84,63 @@ fn paused_time_never_runs_fixed_update() {
         counter.fixed_update, 0,
         "FixedUpdate should never run with paused time"
     );
+}
+
+#[test]
+fn with_timestep_runs_one_fixed_step_per_update_at_that_rate() {
+    use std::time::Duration;
+
+    let timestep = Duration::from_secs_f64(1.0 / 60.0);
+    let mut app = physics_app().with_timestep(timestep);
+    app.insert_resource(TickCounter::default());
+    app.add_systems(FixedUpdate, fixed_update);
+
+    app.fixed_update_n(60);
+
+    assert_eq!(app.world().resource::<TickCounter>().fixed_update, 60);
+    assert_eq!(app.world().resource::<Time<Fixed>>().timestep(), timestep);
+}
+
+#[test]
+fn update_until_stops_once_the_condition_holds() {
+    use std::time::Duration;
+
+    let mut app = msg_testing::minimal_app();
+    app.insert_resource(TickCounter::default());
+    app.add_systems(Update, update);
+
+    let settled = app.update_until(Duration::from_secs(10), |app| {
+        app.world().resource::<TickCounter>().update >= 5
+    });
+
+    assert!(settled);
+    assert_eq!(app.world().resource::<TickCounter>().update, 5);
+}
+
+#[test]
+fn update_until_reports_an_exhausted_budget() {
+    use std::time::Duration;
+
+    let mut app = msg_testing::minimal_app();
+    let settled = app.update_until(Duration::from_millis(20), |_| false);
+    assert!(!settled);
+}
+
+#[test]
+fn advance_time_reaches_a_system_run_once_on_the_generic_clock() {
+    use bevy::ecs::system::RunSystemOnce;
+
+    #[derive(Resource, Default)]
+    struct Seen(f32);
+
+    fn read_delta(time: Res<Time>, mut seen: ResMut<Seen>) {
+        seen.0 = time.delta_secs();
+    }
+
+    let mut app = msg_testing::physics_app();
+    app.insert_resource(Seen::default());
+    app.advance_time_secs(1.5);
+    app.world_mut().run_system_once(read_delta).unwrap();
+
+    msg_testing::assert_approx_eq!(app.world().resource::<Seen>().0, 1.5);
 }

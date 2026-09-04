@@ -11,6 +11,8 @@
 //! - **`AppTesting`** trait - Extension methods for app testing
 //!   - `fixed_update()` - Step through one fixed update
 //!   - `update_n()` / `fixed_update_n()` - Run multiple update cycles
+//!   - `update_until()` - Run updates until a condition holds, bounded by wall-clock time
+//!   - `with_timestep()` - Run the fixed schedule at an application-chosen rate
 //!   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
 //! - **`assert_approx_eq!`** - Absolute-tolerance floating point equality assertion
 //! - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
@@ -108,7 +110,7 @@ use bevy::asset::{AssetMetaCheck, AssetPlugin};
 use bevy::prelude::{Fixed, MinimalPlugins};
 use bevy::time::{Real, Time, TimeUpdateStrategy, Virtual};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 // Re-export float-cmp for ULP-based floating point comparisons in tests
 pub use float_cmp::approx_eq;
@@ -251,10 +253,88 @@ pub trait AppTesting {
     /// ```
     fn fixed_update_n(&mut self, count: usize);
 
+    /// Run `update()` until `done` returns `true` or `budget` of wall-clock
+    /// time has elapsed, sleeping one millisecond between updates so
+    /// background task pools (asset loads, async compute) get a turn.
+    ///
+    /// Returns `true` once `done` holds. Use this to wait for work that
+    /// completes on another thread: a fixed number of `update()` calls
+    /// "usually enough" on a fast machine is what makes such a test flaky on a
+    /// loaded runner, whereas a condition bounded by time only fails when the
+    /// work genuinely did not finish.
+    ///
+    /// The predicate is checked once before the first update, so work that
+    /// already completed costs nothing.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use bevy::prelude::*;
+    /// use msg_testing::{minimal_app, AppTesting};
+    /// use std::time::Duration;
+    ///
+    /// #[derive(Resource, Default)]
+    /// struct Counter(usize);
+    ///
+    /// fn increment(mut counter: ResMut<Counter>) {
+    ///     counter.0 += 1;
+    /// }
+    ///
+    /// let mut app = minimal_app();
+    /// app.init_resource::<Counter>();
+    /// app.add_systems(Update, increment);
+    ///
+    /// let settled = app.update_until(Duration::from_secs(5), |app| {
+    ///     app.world().resource::<Counter>().0 >= 3
+    /// });
+    /// assert!(settled);
+    /// assert_eq!(app.world().resource::<Counter>().0, 3);
+    /// ```
+    fn update_until(&mut self, budget: Duration, done: impl FnMut(&App) -> bool) -> bool;
+
+    /// Run `FixedUpdate` at `timestep`, exactly once per `update()`.
+    ///
+    /// This is what [`physics_app()`] does at Bevy's default rate; call it on
+    /// that app to switch to the application's own rate, so the steps taken
+    /// are the ones the game takes. A plugin added afterwards that replaces
+    /// `Time<Fixed>` with a different timestep breaks the one-step-per-update
+    /// invariant: pass that timestep here instead.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use bevy::prelude::*;
+    /// use msg_testing::{physics_app, AppTesting};
+    /// use std::time::Duration;
+    ///
+    /// #[derive(Resource, Default)]
+    /// struct Steps(usize);
+    ///
+    /// fn count(mut steps: ResMut<Steps>) {
+    ///     steps.0 += 1;
+    /// }
+    ///
+    /// let timestep = Duration::from_secs_f64(1.0 / 60.0);
+    /// let mut app = physics_app().with_timestep(timestep);
+    /// app.init_resource::<Steps>();
+    /// app.add_systems(FixedUpdate, count);
+    ///
+    /// app.fixed_update_n(60);
+    /// assert_eq!(app.world().resource::<Steps>().0, 60);
+    /// assert_eq!(app.world().resource::<Time<Fixed>>().timestep(), timestep);
+    /// ```
+    #[must_use]
+    fn with_timestep(self, timestep: Duration) -> Self;
+
     /// Advance virtual time by the specified number of milliseconds.
     ///
     /// Useful for testing time-dependent systems and timers.
     /// Note: This only advances time; you must call `update()` to run systems.
+    ///
+    /// Both `Time<Virtual>` and the generic `Time` clock advance, so a system
+    /// reading `Res<Time>` sees the delta when run directly afterwards with
+    /// `run_system_once` (the one-shot idiom); on the next `update()`
+    /// `time_system` rewrites `Time` from `Time<Virtual>` as usual.
     ///
     /// # Example
     ///
@@ -317,17 +397,51 @@ impl AppTesting for App {
         }
     }
 
-    fn advance_time(&mut self, millis: u64) {
+    fn update_until(&mut self, budget: Duration, mut done: impl FnMut(&App) -> bool) -> bool {
+        let deadline = Instant::now() + budget;
+        loop {
+            if done(self) {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            self.update();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    fn with_timestep(mut self, timestep: Duration) -> Self {
+        self.insert_resource(Time::<Fixed>::from_duration(timestep));
+
+        // ManualDuration makes time_system set Time<Real>.delta = timestep on every update(),
+        // which propagates to Time<Virtual>.delta = timestep via update_virtual_time,
+        // causing run_fixed_main_schedule to fire expend() exactly once per update().
+        self.insert_resource(TimeUpdateStrategy::ManualDuration(timestep));
+
+        // update_with_instant returns early (without calling advance_by) when last_update is None,
+        // which would cause the first update() to have Time<Real>.delta = 0 and skip FixedMain.
+        // Pre-warming sets last_update so the first update() gives delta = timestep like all others.
         self.world_mut()
-            .resource_mut::<Time<Virtual>>()
-            .advance_by(Duration::from_millis(millis));
+            .resource_mut::<Time<Real>>()
+            .update_with_duration(timestep);
+        self
+    }
+
+    fn advance_time(&mut self, millis: u64) {
+        advance_clocks(self, Duration::from_millis(millis));
     }
 
     fn advance_time_secs(&mut self, secs: f32) {
-        self.world_mut()
-            .resource_mut::<Time<Virtual>>()
-            .advance_by(Duration::from_secs_f32(secs));
+        advance_clocks(self, Duration::from_secs_f32(secs));
     }
+}
+
+fn advance_clocks(app: &mut App, delta: Duration) {
+    app.world_mut()
+        .resource_mut::<Time<Virtual>>()
+        .advance_by(delta);
+    app.world_mut().resource_mut::<Time>().advance_by(delta);
 }
 
 /// Create a test app with minimal plugins and default fixed timestep.
@@ -343,23 +457,8 @@ impl AppTesting for App {
 /// app.fixed_update();
 /// ```
 pub fn physics_app() -> App {
-    let mut app = minimal_app();
-
-    let timestep = app.world().resource::<Time<Fixed>>().timestep();
-
-    // ManualDuration makes time_system set Time<Real>.delta = timestep on every update(),
-    // which propagates to Time<Virtual>.delta = timestep via update_virtual_time,
-    // causing run_fixed_main_schedule to fire expend() exactly once per update().
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(timestep));
-
-    // update_with_instant returns early (without calling advance_by) when last_update is None,
-    // which would cause the first update() to have Time<Real>.delta = 0 and skip FixedMain.
-    // Pre-warming sets last_update so the first update() gives delta = timestep like all others.
-    app.world_mut()
-        .resource_mut::<Time<Real>>()
-        .update_with_duration(timestep);
-
-    app
+    let timestep = minimal_app().world().resource::<Time<Fixed>>().timestep();
+    minimal_app().with_timestep(timestep)
 }
 
 /// Create a test app with paused time.
