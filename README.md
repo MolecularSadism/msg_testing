@@ -97,6 +97,15 @@ app.add_systems(FixedUpdate, my_physics_system);
 app.fixed_update(); // Advance by one fixed timestep
 ```
 
+### `physics_app_with_timestep(timestep)`
+
+`physics_app()` running `FixedUpdate` at an application-chosen rate instead of Bevy's default, still exactly one `FixedMain` per `update()`. Use it when the code under test assumes the game's own fixed rate, or when a plugin added later would otherwise replace `Time<Fixed>` with a different step and break the one-step-per-update invariant.
+
+```rust
+let mut app = physics_app_with_timestep(Duration::from_secs_f64(1.0 / 60.0));
+app.fixed_update_n(60); // one simulated second
+```
+
 ### `paused_app()`
 
 Creates a minimal Bevy app with paused virtual time. Fixed update will never run regardless of how many `app.update()` calls are made. Useful for testing that systems behave correctly when time is frozen.
@@ -127,7 +136,8 @@ Extension trait that adds convenient testing methods to Bevy's `App`:
 - **`fixed_update()`** - Advance time by one fixed timestep and run FixedUpdate
 - **`fixed_update_n(count)`** - Run multiple fixed updates
 - **`update_n(count)`** - Run multiple update cycles
-- **`advance_time(millis)`** - Advance virtual time by milliseconds
+- **`update_until(budget, done)`** - Run updates, sleeping a millisecond between them, until `done(&app)` holds or the wall-clock `budget` elapses; returns whether it held. Use it to wait for task-pool work (asset loads, async compute) instead of a fixed update count
+- **`advance_time(millis)`** - Advance virtual time by milliseconds (also the generic `Time` clock, so `run_system_once` sees it)
 - **`advance_time_secs(secs)`** - Advance virtual time by seconds
 
 ```rust

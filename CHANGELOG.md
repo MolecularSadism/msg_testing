@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Added `physics_app_with_timestep(timestep)`: `physics_app()` at an
+  application-chosen fixed rate, keeping one `FixedMain` run per `update()`.
+- Added `AppTesting::update_until(budget, done)`: runs `update()` with a
+  one-millisecond sleep between calls until `done` holds or the wall-clock
+  `budget` elapses, for waiting on task-pool work without a fixed update count.
+- `advance_time()` / `advance_time_secs()` now advance the generic `Time`
+  clock alongside `Time<Virtual>`, so `run_system_once` on a system reading
+  `Res<Time>` sees the delta.
+
 ## 0.3.1
 
 - `gpu` feature no longer pulls in `bevy/default` (audio, 2d, 3d, ui); it now
