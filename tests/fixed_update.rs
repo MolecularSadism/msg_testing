@@ -87,11 +87,11 @@ fn paused_time_never_runs_fixed_update() {
 }
 
 #[test]
-fn physics_app_with_timestep_runs_one_fixed_step_per_update_at_that_rate() {
+fn with_timestep_runs_one_fixed_step_per_update_at_that_rate() {
     use std::time::Duration;
 
     let timestep = Duration::from_secs_f64(1.0 / 60.0);
-    let mut app = msg_testing::physics_app_with_timestep(timestep);
+    let mut app = physics_app().with_timestep(timestep);
     app.insert_resource(TickCounter::default());
     app.add_systems(FixedUpdate, fixed_update);
 

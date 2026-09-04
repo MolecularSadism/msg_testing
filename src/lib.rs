@@ -6,13 +6,13 @@
 //! # Features
 //!
 //! - **`physics_app()`** - Pre-configured test app with fixed timestep
-//! - **`physics_app_with_timestep()`** - The same at an application-chosen fixed rate
 //! - **`paused_app()`** - Test app with frozen time
 //! - **`minimal_app()`** - Bare test app with only `MinimalPlugins`
 //! - **`AppTesting`** trait - Extension methods for app testing
 //!   - `fixed_update()` - Step through one fixed update
 //!   - `update_n()` / `fixed_update_n()` - Run multiple update cycles
 //!   - `update_until()` - Run updates until a condition holds, bounded by wall-clock time
+//!   - `with_timestep()` - Run the fixed schedule at an application-chosen rate
 //!   - `advance_time()` / `advance_time_secs()` - Manipulate virtual time
 //! - **`assert_approx_eq!`** - Absolute-tolerance floating point equality assertion
 //! - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
@@ -292,6 +292,40 @@ pub trait AppTesting {
     /// ```
     fn update_until(&mut self, budget: Duration, done: impl FnMut(&App) -> bool) -> bool;
 
+    /// Run `FixedUpdate` at `timestep`, exactly once per `update()`.
+    ///
+    /// This is what [`physics_app()`] does at Bevy's default rate; call it on
+    /// that app to switch to the application's own rate, so the steps taken
+    /// are the ones the game takes. A plugin added afterwards that replaces
+    /// `Time<Fixed>` with a different timestep breaks the one-step-per-update
+    /// invariant: pass that timestep here instead.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use bevy::prelude::*;
+    /// use msg_testing::{physics_app, AppTesting};
+    /// use std::time::Duration;
+    ///
+    /// #[derive(Resource, Default)]
+    /// struct Steps(usize);
+    ///
+    /// fn count(mut steps: ResMut<Steps>) {
+    ///     steps.0 += 1;
+    /// }
+    ///
+    /// let timestep = Duration::from_secs_f64(1.0 / 60.0);
+    /// let mut app = physics_app().with_timestep(timestep);
+    /// app.init_resource::<Steps>();
+    /// app.add_systems(FixedUpdate, count);
+    ///
+    /// app.fixed_update_n(60);
+    /// assert_eq!(app.world().resource::<Steps>().0, 60);
+    /// assert_eq!(app.world().resource::<Time<Fixed>>().timestep(), timestep);
+    /// ```
+    #[must_use]
+    fn with_timestep(self, timestep: Duration) -> Self;
+
     /// Advance virtual time by the specified number of milliseconds.
     ///
     /// Useful for testing time-dependent systems and timers.
@@ -377,6 +411,23 @@ impl AppTesting for App {
         }
     }
 
+    fn with_timestep(mut self, timestep: Duration) -> Self {
+        self.insert_resource(Time::<Fixed>::from_duration(timestep));
+
+        // ManualDuration makes time_system set Time<Real>.delta = timestep on every update(),
+        // which propagates to Time<Virtual>.delta = timestep via update_virtual_time,
+        // causing run_fixed_main_schedule to fire expend() exactly once per update().
+        self.insert_resource(TimeUpdateStrategy::ManualDuration(timestep));
+
+        // update_with_instant returns early (without calling advance_by) when last_update is None,
+        // which would cause the first update() to have Time<Real>.delta = 0 and skip FixedMain.
+        // Pre-warming sets last_update so the first update() gives delta = timestep like all others.
+        self.world_mut()
+            .resource_mut::<Time<Real>>()
+            .update_with_duration(timestep);
+        self
+    }
+
     fn advance_time(&mut self, millis: u64) {
         advance_clocks(self, Duration::from_millis(millis));
     }
@@ -407,58 +458,7 @@ fn advance_clocks(app: &mut App, delta: Duration) {
 /// ```
 pub fn physics_app() -> App {
     let timestep = minimal_app().world().resource::<Time<Fixed>>().timestep();
-    physics_app_with_timestep(timestep)
-}
-
-/// Like [`physics_app()`], but running `FixedUpdate` at `timestep` instead of
-/// Bevy's default. Use it when the code under test assumes the application's
-/// own fixed rate, so every `update()` still runs `FixedMain` exactly once and
-/// the steps are the ones the game takes.
-///
-/// A plugin added afterwards that replaces `Time<Fixed>` with a different
-/// timestep breaks the one-step-per-update invariant: pass that timestep here
-/// instead.
-///
-/// # Example
-///
-/// ```
-/// use bevy::prelude::*;
-/// use msg_testing::{physics_app_with_timestep, AppTesting};
-/// use std::time::Duration;
-///
-/// #[derive(Resource, Default)]
-/// struct Steps(usize);
-///
-/// fn count(mut steps: ResMut<Steps>) {
-///     steps.0 += 1;
-/// }
-///
-/// let timestep = Duration::from_secs_f64(1.0 / 60.0);
-/// let mut app = physics_app_with_timestep(timestep);
-/// app.init_resource::<Steps>();
-/// app.add_systems(FixedUpdate, count);
-///
-/// app.fixed_update_n(60);
-/// assert_eq!(app.world().resource::<Steps>().0, 60);
-/// assert_eq!(app.world().resource::<Time<Fixed>>().timestep(), timestep);
-/// ```
-pub fn physics_app_with_timestep(timestep: Duration) -> App {
-    let mut app = minimal_app();
-    app.insert_resource(Time::<Fixed>::from_duration(timestep));
-
-    // ManualDuration makes time_system set Time<Real>.delta = timestep on every update(),
-    // which propagates to Time<Virtual>.delta = timestep via update_virtual_time,
-    // causing run_fixed_main_schedule to fire expend() exactly once per update().
-    app.insert_resource(TimeUpdateStrategy::ManualDuration(timestep));
-
-    // update_with_instant returns early (without calling advance_by) when last_update is None,
-    // which would cause the first update() to have Time<Real>.delta = 0 and skip FixedMain.
-    // Pre-warming sets last_update so the first update() gives delta = timestep like all others.
-    app.world_mut()
-        .resource_mut::<Time<Real>>()
-        .update_with_duration(timestep);
-
-    app
+    minimal_app().with_timestep(timestep)
 }
 
 /// Create a test app with paused time.

@@ -2,8 +2,9 @@
 
 ## 0.4.0
 
-- Added `physics_app_with_timestep(timestep)`: `physics_app()` at an
-  application-chosen fixed rate, keeping one `FixedMain` run per `update()`.
+- Added `AppTesting::with_timestep(timestep)`: `physics_app().with_timestep(..)`
+  runs `FixedUpdate` at an application-chosen rate, keeping one `FixedMain`
+  run per `update()`.
 - Added `AppTesting::update_until(budget, done)`: runs `update()` with a
   one-millisecond sleep between calls until `done` holds or the wall-clock
   `budget` elapses, for waiting on task-pool work without a fixed update count.
