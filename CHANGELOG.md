@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1
+
+- Added `GpuAppTesting` (`gpu` feature): `offscreen_target(size)` gives a camera an
+  image to render into, since a `gpu_app()` has no window, and `update_gpu()` runs
+  `update()` then blocks until the GPU has executed the frame, so benches time the
+  GPU work and not only its submission.
+- `gpu_app()` installs `LogPlugin` only for the first app in a process; later apps
+  no longer log an error for the already-set global subscriber.
+- `gpu` feature enables `bevy/bevy_log`.
+
 ## 0.4.0
 
 - Added `AppTesting::with_timestep(timestep)`: `physics_app().with_timestep(..)`
@@ -15,8 +25,7 @@
 ## 0.3.1
 
 - `gpu` feature no longer pulls in `bevy/default` (audio, 2d, 3d, ui); it now
-  enables only `bevy_render`/`bevy_winit`/`bevy_image`/`bevy_window`, so
-  `gpu_app()` no longer drags `bevy_audio` into consumers' test builds.
+  enables only `bevy_render`/`bevy_winit`/`bevy_image`/`bevy_window`.
 
 ## 0.3.0
 

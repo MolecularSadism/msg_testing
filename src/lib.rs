@@ -168,7 +168,7 @@ macro_rules! assert_approx_eq {
 #[cfg(feature = "gpu")]
 pub mod gpu;
 #[cfg(feature = "gpu")]
-pub use gpu::{GpuBenchConfig, gpu_app, gpu_app_ready, is_software_renderer};
+pub use gpu::{GpuAppTesting, GpuBenchConfig, gpu_app, gpu_app_ready, is_software_renderer};
 
 /// Extension trait for App to add testing utilities.
 ///

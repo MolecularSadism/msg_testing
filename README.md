@@ -14,7 +14,7 @@ A testing utilities crate for Bevy applications, providing convenient helpers fo
 - **Float comparison helpers** - `assert_approx_eq!` with a default `1e-4` absolute tolerance (and `approx_eq!` re-exported from float-cmp)
 - **Default timestep handling** - Uses Bevy's default fixed timestep automatically
 - **`fixture_dir()`** - Throwaway directory tree for tests that feed themselves their own files
-- **`gpu` feature** - `gpu_app()`, `gpu_app_ready()`, `is_software_renderer()`, and `GpuBenchConfig` for tests/benches that need a real render backend
+- **`gpu` feature** - `gpu_app()`, `gpu_app_ready()`, `is_software_renderer()`, `GpuBenchConfig`, and `GpuAppTesting` (`offscreen_target()`, `update_gpu()`) for tests/benches that need a real render backend
 
 ## Installation
 
