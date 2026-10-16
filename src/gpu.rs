@@ -80,7 +80,7 @@ pub trait GpuAppTesting {
 
 impl GpuAppTesting for App {
     fn offscreen_target(&mut self, size: UVec2) -> RenderTarget {
-        let image = Image::new_target_texture(size.x, size.y, TextureFormat::bevy_default(), None);
+        let image = Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
         let handle = self.world_mut().resource_mut::<Assets<Image>>().add(image);
         RenderTarget::Image(handle.into())
     }
