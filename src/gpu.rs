@@ -56,11 +56,16 @@ pub fn gpu_app_ready(app: &mut App) {
 pub trait GpuAppTesting {
     /// A render target backed by a new `size`-pixel colour image, for a camera to draw into.
     ///
-    /// ```no_run
-    /// use bevy::prelude::*;
-    /// use msg_testing::{GpuAppTesting, gpu_app};
+    /// Only `Assets<Image>` is needed, so the example runs without a GPU; a [`gpu_app`]
+    /// renders into the target.
     ///
-    /// let mut app = gpu_app();
+    /// ```
+    /// use bevy::prelude::*;
+    /// use msg_testing::{GpuAppTesting, test_asset_plugin};
+    ///
+    /// let mut app = App::new();
+    /// app.add_plugins((MinimalPlugins, test_asset_plugin()));
+    /// app.init_asset::<Image>();
     /// let target = app.offscreen_target(UVec2::new(1920, 1080));
     /// app.world_mut().spawn((Camera2d, target));
     /// ```
@@ -75,7 +80,7 @@ pub trait GpuAppTesting {
 
 impl GpuAppTesting for App {
     fn offscreen_target(&mut self, size: UVec2) -> RenderTarget {
-        let image = Image::new_target_texture(size.x, size.y, TextureFormat::bevy_default(), None);
+        let image = Image::new_target_texture(size.x, size.y, TextureFormat::Rgba8UnormSrgb, None);
         let handle = self.world_mut().resource_mut::<Assets<Image>>().add(image);
         RenderTarget::Image(handle.into())
     }

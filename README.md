@@ -22,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-msg_testing = "0.3"
+msg_testing = "0.5"
 ```
 
 ## Quick Start
@@ -232,6 +232,7 @@ All time-related behavior matches what you'd see in a real Bevy application.
 
 | `msg_testing` | Bevy   |
 |---------------|--------|
+| 0.5           | 0.19   |
 | 0.1-0.4       | 0.18   |
 
 ## License
