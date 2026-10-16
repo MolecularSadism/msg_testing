@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Bevy 0.19.
+- `gpu` feature enables `bevy/x11`, so it builds on Linux without the host
+  application supplying a windowing backend.
+- Added the shared Bevy 0.19 CI workflow.
+
 ## 0.4.1
 
 - Added `GpuAppTesting` (`gpu` feature): `offscreen_target(size)` gives a camera an
